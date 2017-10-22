@@ -1,0 +1,186 @@
+
+1)
+- There are no known bugs to my knowledge
+
+2)
+
+* DiskMultiMap:
+
+For the implementation I use a DiskNode which is a struct with an offset and a 121 char array. Works like a node from a single linked link list
+
+- CreateNew:	My Disk uses a hash table of offsets that work as header offsets to a single linked list. It has complexity of O(N) with N being the number of buckets passed.
+{
+	Close any open files
+	Create a new file with the given name
+		If this fails, return false
+	Write a header unsigned int with the number of buckets at offset 0 in the binary file
+	Write a null Offset (=0) at location sizeof(unsigned int). This one is used as a linked list of deleted items for reuse.
+	For each bucket in the hash table
+		Write a null offset at the end of the file
+			If any writing fails, return false
+	Everything worked fine, return true
+}
+
+- Insert: Insert a DiskNode holding a cString of the summed 3 strings passed. The insert function has a O(1) because no matter what, insertion will always take the same time. Hash, get a location to insert, insert and re-link the linked list.
+{
+	If the file isn’t open, return false
+	If the sizes of the 3 strings together + 2 (‘ ‘) are bigger than 120, return false
+	
+	create a single string by adding the 3 ones given, separated by ‘ ‘
+	Create a new DiskNode, and update it’s cString to the string formed before
+	Read the number of buckets from the head of the file.
+	Use a hash function on the key to get the bucket number for the log
+	Read the offset at the bucket number returned by the hash function
+	Make the DiskNodes offset equal to the offset stored in the bucket
+	
+	Call the private function goodInsert() that looks up an inserting location. It returns the first item of the deleted links list or the end of the file.
+	Write the offset returned by goodInsert() on the bucket selected after hashing (change head of linked list).
+	Write the DiskNode at the location returned before.
+		If the writing fails return false
+
+	Everything worked, return true
+}
+
+- Search: Searches through the file for the first encountered matching key (that happens to be the last matching key inserted). Search is of O(N/B), being N/B the average number of items per bucket. This isn’t constant for the case of collisions with different keys.
+{
+	If the file isn’t open, return
+	Read the number of buckets from offset 0
+	Call the hashing function to get bucket location for the given key
+	read the offset at the bucket location. Make a var ‘location’ equal to it
+	if the bucket is empty (offset == 0) return an empty, invalid iterator
+	do once and keep doing until ‘location’ == 0 (invalid)
+		read the diskNode at offset ‘location’
+		make a MultiMapTuple out of that DiskNode by calling multiMapping(DiskNode). multiMapping transforms the cString of the DiskNode to 3 separate strings and returns a Tuple with those strings.
+		if the key of the Tuple matches the key passed
+			return an iterator that holds the offset to the successful DiskNode
+		It doesn’t match, make ‘location’ equal to the offset in the DiskNode previously read
+
+	Unsuccessfully reached the end of the list, return an empty invalid iterator.
+		
+- Erase: Erases all entries with an exact key, value and context. Erase runs on O(N/B), being the time to search for the items to delete in the linked list (the whole linked list is traversed for this function). In theory it would be N/B * K, with K being the number of elements in that specific list.
+{
+	If the file isn’t open, return -1
+	Create an int to count for the number of deletions, set to 0
+	Read the bucket and do hashing to the key to get the bucket number
+	Read the offset stored in the returned bucket’s location
+	If the offset read (‘current’) is == 0
+		return 0
+	while offset is valid != 0	//Adjusts the hash bucket itself
+		read the DiskNode at that location
+		Create a MultiMapTuple based on that DiskNode
+		if the MultiMapTuple’s strings match the ones given, start deletion
+			read the offset stored at position sizeof(unsigned int) to access the deleted items linked list
+			create an empty DiskNode and set its offset to the value the deleted linked list offset had
+			write this empty node at location ‘current’ (where it was, but with updated offset)
+			write the offset ‘current’ as new head for the deleted linked list
+			increase the number of deletions int by 1
+		if the Tuple didn’t match, make a ‘prev’ offset = to the ‘current’ offset and ‘current’ = to the DiskNode’s stored offset. End up by breaking of the loop
+		make an offset prev equal to current
+		make current equal to the offset of the initially read DiskNode
+	//Recheck for the case that the new first item will also get deleted
+	create a copy of the last DiskNode read. This holds the last non deleted node
+	while current is != 0 (check for more matching items)
+		read the DiskNode at offset ‘current’
+		make a multiMapTuple form the read DiskNode
+		if the Tuple’s strings match the strings passed
+			make the prevNode’s (created at the beginning of the while loop) offset = to the offset of the last read DiskNode
+			insert the prevNode in the ‘previous’ location offset (it has same cString but different offset link)
+			the same as before, add the DiskNode to the deleted linked list
+			increase the number of deletions by 1
+		if the Tuple didn’t match, make the offset ‘previous’ = to the offset ‘current’ and make the prevNode = to the actual node
+		make the offset ‘current’ = to the offset form the last read DiskNode
+}
+
+//————————————————————————————————————————————————————————————//
+
+* Iterator: The iterator holds a MultiMapTuple, a pointer to a BinaryFile, a string key and an offset location
+
+- Constructors:
+	* Null iterator sets valid to false, and has no location. It’s BinaryFile pointer is null
+	* Copy constructor, copies the Tuple, pointer, offset and key and sets validity’s equal
+	* operator= same as copy constructor, but without creating anything new
+	* Offset constructor, creates a valid Iterator with the given offset as member
+	
+- operate++:	Advances to the following location with matching key. The complexity is of O(K) with K being the number of elements in the specific bucket
+{
+	if the iterator isn’t valid, return itself
+	while the private offset ‘location’ isn’t 0
+		read the DiskNode at that location from the BinaryFile pointer
+		change ‘location’ to the DiskNode’s offset
+		if the key from the cString inside the DiskNode matches the string key (private member)
+			update the multiMap private member to match the new value, set validity to true and return this iterator
+	If no next iterator was found, set validity to false and return this
+}
+
+- operator*: Returns the stored tuple, returns a null tuple if the iterator is invalid. It has complexity of O(1).
+{
+	if the iterator is invalid
+		return an empty multiMapTuple
+	else
+		return the multiMapTuple member variable
+}
+
+//————————————————————————————————————————————————————————————//
+
+* IntelWeb:
+
+- ingest: opens a dat/txt file and writes all of its logs in 2 files. The complexity is of O(N), where N is the number of lines in the telemetry file.
+{
+	open the telemetryFile with ifstream
+	get each line from the telemetry file
+		transform the read line to a MultiMapTuple called m
+		create a Tuple with rearranged values of m. Insert this Tuple to file 1 (dmm[0])
+		create a Tuple with rearranged values of m (key and value are swapped compared to the previous one) and insert it to file 2 (dmm[1])
+	if any insertion fails, return false. If they are successful, return true
+}
+
+- crawl: examines for malicious connections. I don’t know how to determine the complexity of crawl, since it depends on the connections of the indicators. The complexity of the sorting of the bad entities is of O(N log N) with N being the number of bad entities found. Also sorting the interaction logs has complexity of O(N log N), with N being the number of interaction logs in the vector.
+{
+	no indicators, return 0. Nothing can be found
+	empty the badEntities and interactions vector
+	create a queue q and push all the malicious entities passed
+	create a map of strings and booleans, insert all the malicious entities passed with value false
+	
+	while there are items in the queue
+		get the string in the front and pop it. Set the s to that string
+	
+		search for s in the first file (dmm[0]) and set that to iter
+		{
+		while the iterator iter is valid
+			get the tuple by using *i
+			create an appropriate logTuple and push it to the interactions vector
+		get a new suspect, being suspect the entity that interacted with s
+		if the new suspect hasn’t been examined yet and it’s prevalence is low enough
+			push the suspect to the queue and push the suspect to the malicious entities found vector
+		do ++i to move to the next matching key
+		}
+		
+		repeat the same as above but for file 2 (dmm[1])
+
+	sort the badEntitiesFound
+	sort the interactions vector and remove duplicates
+	return the number of items on indicators added to the number of items in badEntitiesFound
+}
+
+- purge: clear all interactions relating an entity. The complexity would be of O(K N/B), with K being the number of interactions the entity has and N/B the average number of items per bucket. Purge might not satisfy the Big-O requirements in the case that different keys hash to the same bucket.
+{
+	create a multiMapTuple queue q.
+	search for the entity on file 1 (dmm[0]) and save the iterator as i0
+	while i0 is a valid iterator
+		push *i (a Tuple) to the queue
+		do ++i to find next key match
+	search for the entity on file 2 (dmm[1]) and save the iterator as i1
+	while i1 is a valid iterator
+		push *i to the queue and use ++i to get next key match
+
+
+	while the queue has items
+		get the front item, save it as m, and pop it
+		call erase for file 1 and 2 in the two sided interactions. These interactions being: key-value-context and value-key-context
+
+	if at least 1 item gets erased, return true, else return false.
+}
+	
+
+
+

@@ -1,0 +1,10 @@
+
+2) This will cause an error because Coord has no copy constructor or overloaded operator=. It’s not possible for the compiler to copy it’s value to the list. Also, in the process of finding if it could be inserted, Coord has no overload of the comparison operators so its impossible for the insertion to compare existing Coords with the new one.
+
+3b) The overload was necessary for subclasses to get information about the path of their parent class/es. Recursion is necessary to ensure all child classes will be called in proper order. The use of loops would output all main classes, discarding the order of parent=>child. The use of stacks or queues would require an extra parameter to would the path.
+
+4) The gov’t
+	a) The time complexity would be of O(N^3). A power of N to go through each one of the for loops. The first 2 for the 2D array and the third to search for intermediaries.
+	b) The time complexity would still be of O(N^3). The algorithm will go through half the array. This would be O((N^3)/2) that is O(N^3). I see it as the area of a square and half the area of that square (for the 2D array part). 
+
+5) The time complexity would be of O(N^2). This is determined by the loop through the N elements, calling get, that should go through N elements worst case. Insert or erase should also worst case go through N elements, but this would be a multiplier to N.

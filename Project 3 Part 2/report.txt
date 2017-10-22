@@ -1,0 +1,736 @@
+1) Classes and member functions:
+
+class Actor: public GraphObject
+class NonHuman: public Actor
+class Human: public Actor
+class Goodies: public NonHuman
+class Dirt: public NonHuman
+class Boulder: public NonHuman
+class Squirt: public NonHuman
+class Barrel: public Goodies
+class Gold: public Goodies
+class Sonar: public Goodies
+class WaterPool: public Goodies
+class FrackMan: public Human
+class Protester: public Human
+class HardCore: public Protester
+
+
+Actor’s functions:
+
+- virtual doSomething() = 0: Every subclass has its own doSomething, so it’s pure virtual
+
+- virtual void annoy (int power, bool boulder): This function does nothing by default, unless it is called by a Human subclass
+
+- void setDead(): changes a the variable m_dead to true within Actor. No sub-class has a variant
+
+- bool isDead() const: returns m_dead, to see if the item was set as dead or not for cleaning up
+
+- StudentWorld* getWorld(): returns a pointer to the student world
+
+- int getTick() const: returns the variable m_ticks, used for lifespans
+
+- void setTick(int nTicks): sets m_ticks to the given value
+
+- virtual bool isBoulder() const: returns falls. Virtually used to differentiate between boulders and the rest
+
+- virtual bool isHuman() const: returns false. Virtually differentiate between humans and non-humans
+
+- virtual bool isHard() const: returns false. Virtually used to separate hardcore protesters from everything else
+
+- virtual void leaveField(): does nothing. Virtually used to make protesters leave the field
+
+- virtual bool leaving() const: returns false by default. Virtually used to determine if a protester is in leaving state
+
+- virtual void bribeHard(): does nothing. Virtually used to bribe hardcore protesters
+
+- virtual void stun(int num): does nothing. Virtually used to stun protesters
+
+- virtual void leaveTheFieldRightNow(): does nothing. Virtually used to make protesters leave
+
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————//
+
+NonHuman’s functions:
+
+- NonHuman constructor: initializes the parent class Actor with the parameters given to it
+
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————//
+
+Dirt’s functions:
+
+- Dirt constructor: built on an x,y coordinate. Passes by default size, depth and IID.
+
+- void doSomething(): does nothing, well, it’s dirt after all
+
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————//
+
+Boulder’s functions:
+- Boulder constructor: sets state to stable and clears the dirt of the square it occupies.
+
+- bool isBoulder(): returns true all the time. Used to differentiate this actor from anything else because it can’t be walked through.
+
+- void doSomething(): 
+{
+	if the boulder is dead return
+	if the boulder is stable
+		check if the dirt underneath it has been cleared
+			if it’s empty (4 blocks directly underneath), set state stable to false
+	else, the boulder is unstable
+		if less than 30 ticks have elapsed since set to unstable, increase tick count by 1, return
+		the boulder is already falling
+			if the distance between the boulder and frackman is less than 3
+				kill the frackman (set him to dead)
+			call humanBoulder from StudentWorld
+				checks if the boulder collided with any protester and kills them if so, increases score respectively
+
+			check if it can move 1 square down: no dirt underneath or out of map or another boulder
+				true = move 1 down; false = set the boulder to dead and visible to false
+}			
+
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————//
+
+Squirt’s functions:
+
+- Squirt’s constructor: initialize NonHuman parent class and set ticks to 4 (lifespan)
+
+- void doSomething():
+{
+	if it’s dead return
+	call StudentWorld’s function squirtMan: 
+		check if the squirt is within distance 3 of a protester. If so, do the appropriate stuff (annoy, kill or stun) and return true, otherwise return false
+			if squirtMan returned true, set the squirt to dead and return
+	if the ticks on squirt are equal to 0, set squirt to dead and return
+	else decrease ticks by 1
+
+	check if it can move one step towards the direction it’s pointing
+		if it can (no dirt, no boulders, no out of bounds), then move 1 step towards that direction
+		it can’t move one more, set it to dead and return
+}
+
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————//
+
+Goodies’ functions:
+
+- Goodies constructor: initialize the parent class with the attributes given by its children classes. Set a variable m_score to the score the subclass gives.
+
+- bool itemProximity(): 
+{
+	if the frackman’s distance to the Goodie is less than or equal to 3, set it to dead, invisible, increase the score by m_score and return true. 
+	If the Goodies’ distance from frackman is more than 3 but less or equal to 4, set the goodie to visible.
+	return false
+}
+
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————//
+
+Barrel’s functions:
+
+- void doSomething():
+{
+	if dead, return
+	use Goodies’ itemProximity
+		if true, play SOUND_FOUND_OIL and decrease StudentWorld’s oil count
+}
+
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————//
+
+Gold’s functions:
+
+- Gold constructor: initialize parent class. If the gold is pickable (by frackman) set it to invisible. Else, set it to visible and set it’s ticks to 0
+
+- void doSomething():
+{
+	if dead, return
+	if pickable, use Goodies’ itemProximity
+		if true play SOUND_FOUND_GOODIE and increase frackman’s gold count
+	if not pickable
+		if 100 or more ticks have elapsed since its creation, set it to dead and return
+		else, increase the tick count by 1
+		call StudentWorld’s greedyB to check if any protester can pickup the gold
+			if true, set the gold to dead and return
+}
+
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————//
+
+Sonar’s functions:
+
+- void doSomething():
+{
+	if dead return
+	call itemProximity
+		if true, increase frackman’s sonar count and play sound and return
+	if the tick count is greater than the sonar’s lifetime
+		set to dead and return
+	else, increase ticks by 1
+}
+
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————//
+
+WaterPool’s functions:
+
+- WaterPool constructor: initialize parent class, set ticks to 100 (lifespan)
+
+- void doSomething():
+{
+	if dead, return
+	call itemProximity
+		if true, set to dead, increase frackman’s sonar count and return
+	if the tick count is less or equal to 0, return
+	else, decrease tick count by 1
+}
+
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————//
+
+Human’s functions:
+
+- void annoy(int power, int boulder):
+{
+	if the Human is leaving the field (protester) don’t annoy any more
+	decrease health by “power”
+	if the Human is the frackman himself
+		if it’s health is 0 or less, set him to dead and play player give up sound
+		else, still alive, play player annoyed sound
+	the Human isn’t the frackman (a protester)
+		if it’s still alive, stun for N ticks
+		else, he died :(
+			call leaveField for protester to leave. and play protester give up sound
+			if killed by a boulder increase score by 500
+			else, squirted to death, if its a hardCore protester increase score by 50, regular protester by 25
+}
+
+- bool isHuman() const: returns true all the time. Used by StudentWorld to separate humans from nonHumans
+
+- int health() const: returns the Human’s health
+
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————//
+
+FrackMan’s functions:
+
+- FrackMan constructor: initialize parent class, set gold count to 0, water count to 5 and sonar count to 1
+
+- adjustGold; adjustWater; adjustSonar: all of them adjust the specific variable by the amount passed
+
+- goldCount; waterCount; sonarCount: all of them return the value of the specific variable
+
+- void doSomething()
+{
+	if dead, return
+	call StudentWorld’s getKey
+		if true, act according to the key pressed
+			for every direction key (wasd or arrows or numeric pad)
+				if the frack isn’t looking in that direction, turn to that direction. Return afterwards.
+				check if frack can move 1 square in the direction (no boulder’s, no out of bounds and is looking in that direction)
+					move 1 step in that direction, clear the dirt in the frack’s 4x4 image and return
+						if dirt was actually cleared, play dig sound
+			if esc was pressed, set frack to dead and play player give up sound, return
+			‘Z’ or ‘z’ where pressed, 
+				if frack’s sonarCount > 0, call StudentWorld’s sonarReveal
+			if tab was pressed
+				if fracks goldCount > 0, decrease gold by 1 and call StudentWorld’s dropGold()
+			if space was pressed
+				if fracks waterCount > 0, decease water by 1 and call StudentWorld’s allocateSquirt
+}
+
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————//
+
+Protester’s functions:
+
+- Protester constructor:
+{
+	compute waitTicks (rest ticks) and store it
+	set leavingField to false
+	set turn ticks to 0
+	push the protester’s location to a list called path. This list receives of type Coord, declared in the private part
+}
+
+- Direction chooseD (Direction avoid1 = none, Direction avoid2 = none): chooses a random Direction for the protester to move
+{
+	avoid1 and avoid2 are set by default to none. These two are used for intersections if passed
+	do once 
+		generate a random number r from 0 to 3 (each number representing a direction)
+		for each number 0 to 3
+			if r is equal to the number and the direction it represent is different to avoid1 and avoid2
+				if could move at least 1 square in the direction represented (no dirt, boulder or out of bounds), return that direction
+	repeat until a good value is obtained
+}
+
+- void leaveTheField(): sets the protester’s state to leaving the field	
+	
+- bool shoutProtest()
+{
+	if the distance between the frackman and this protester is less than or equal to 4
+		if the distance is 0, return true. Overlapping with the frack.
+		for every direction
+			if the protester is in line of sight with the frack and the direction its looking at is correct
+				return true
+	return false
+}
+
+- bool checkSquareDirty (int x, int y): returns true if there is at least one dirt in the 4x4 square formed at coordinates x,y
+
+- Direction lineWithFrack(): returns a direction if the protester can walk in a straight line and reach the frackman, else wise returns none
+{
+	for each direction
+		check if the frackman is within the line of sight of +-4
+			from the protesters x,y to the frackman’s (x+-4, y+-4) (depending on each direction)
+				if there is dirt or a boulder that would impede the straight line movement, return none
+				else, the protester can walk in a straight line with no problems, return the direction the frackman is located at respect to this protester
+}
+
+- bool leaving() const: returns true if the protester is leaving, false if he isn’t
+
+- bool shoutProtest(): returns true if the protester is within range 4 and facing the frackman aka he can annoy
+{
+	if the protesters distance to the frack is more than 4, return false
+	else, within the 4 range
+		for every direction 
+			if the frackman is within the line of sight, but the protester isn’t facing the right correction
+				change the direction so the protester is looking at the frack, return false
+			else, the protester is looking at the right direction, return true
+}
+
+- bool intersection(): returns true if there is a perpendicular to the path
+{
+	create a bool set to false for every direction
+		set the bool for that direction to true if at least one step could be given in that direction
+	return true if (either up or down are true) AND (either left or right are true)
+}
+
+
+- virtual void stun (int num): stuns the protester by num ticks (by squirt for example). This function is virtual because the hardcore protester has the same function, but it manages its own private members
+
+- void recordMove(): records the coordinate of the protester in a list. It is used afterwards to leave the field
+{
+	create a Coord type with the protesters x and y
+	if the list isn’t empty
+		starting from the last item of the list up to the first one
+			check if the Coord is already on the list
+				if it is, pop all the items after that Coord and return
+				if the item wasn’t found on the list or the list is empty, append it.
+} 
+
+- void leaveTheFieldRightNow(): the protester is leaving the field, he backtracks a list of coordinates to get back to the origin
+{
+	if the path list isn’t empty
+		pop the last Coord on the list
+		move to that Coord and change the direction if necessary
+	if the protester is at position (60, 60), set him to dead
+}
+
+- virtual void doSomething():
+{
+	if dead, return
+	
+	if the protester is in rest state, waitStatus < waitTicks
+		add 1 to the waitStatus and return
+	else, he rested enough
+		set waitStatus to 0
+		decrease dirChangeTicks by 1 (ticks to do a random direction change)
+		decrease shoutWait ticks by 1 (ticks to annoy poor frackman)
+	
+	if the protester is leaving
+		call leaveTheFieldRightNow to get 1 step closer to the exit and return
+
+	if the protester hasn’t shouted in a while (shoutWait <= 0)
+		call shoutProtest to see if the hardcore is within shouting range and correct alignment
+			if true, play the annoying sound
+			annoy the frack by 2
+			set shoutTicks to 15 and return
+	else if the protester is within distance 4 but cant shout, return
+	
+	call lineWithFrack to see if the protester could walk a straight line to the frack
+	if the direction returned isn’t “none”
+		change the direction to the direction returned and give a step towards it
+		record the new position
+		set steps left to 0 and return
+	
+	decrease the number of steps left by 1
+	if steps left is less or equal to 0
+		choose a new direction by calling chooseD
+		change steps left to a random number between 8 and 60 both inclusive
+		
+	if the dirChangeTicks is <= to 0 and calling intersection() returns true
+		set dirChangeTicks to 200
+		call chooseD and pass the current direction and the opposite direction as avoid1 and avoid2
+		set the direction to this new D, and compute a new number of steps left
+			 
+	for the given direction, check if the protester can move once in that direction
+		if he can, move towards it
+		if he can’t set the number of steps left to 0 (to choose a new direction next non-rest tick)
+	
+	call recordMove to record the new position
+}
+
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————//
+
+HardCore’s functions:
+
+- void bribeHard(): bribes a hardcore with gold, stuns him for 50 ticks
+
+- void createMaze(char map[][64]): creates a map on a 2D char array, with ‘O’ on empty coordinates and ‘X’ on dirty or boulder coordinates
+{
+	for x coordinate 0 through 63
+		for y coordinate 0 through 63
+			check if the coordinate x,y has dirt
+			if it does, set that coordinate on the map to ‘X’
+			else if, check if there is a boulder in that location
+				if there is, mark the 4x4 square the boulder occupies with ‘X’s on the map
+			else if, if the coordinate doesn’t have an ‘X’ written on it
+				mark the coordinate with ‘O’ on the map
+}
+
+- bool solveInRange(int sx, int sy, int ex, int ey, char maze[][64], int& maxDepth, int M): uses a queue based maze solver to search for the frackman within M steps from the protester
+{
+	create a queue of Coords. These Coords hold a variable called deepness
+	push the starting coordinate (sx,sy) with deepness 0 to the queue 
+	while the queue has element on it
+		if the deepness of the front Coord is greater than M, return false (M is a hardcore’s cell phone sense)
+		if the coordinate of the front is the same as the exit, return true and change maxDepth to the depth of the Coord in the front
+		for every direction
+			if the spot in that direction has a ‘O’ and the protester would be able to move in that direction (no dirt, out of bounds or boulder)
+				change the spot’s char to a ‘ ‘ and push the coordinate of that spot, with deepness+1 respect of the front Coord
+		pop the front item
+	couldn’t find the frack within range, return false
+}
+
+- bool findPath (int x, int y int ex, int ey, char maze[][64], int m, int depth = 0, Direction di = none): recursively finds the optimal solution to the frackman. It is called after solveInRange, so possible steps are marked with ‘ ‘, marking the optimal path with ‘?’
+{
+	if x,y == ex,ey return true
+	if x or y are out of bounds return false
+	if the depth is bigger than m, return false
+	create a bool for every direction (bool a, b, c, d) and set them all to false 
+	for every direction
+		if giving a step leads to a ‘ ‘ on the maze and the variable di isn’t the opposite direction (no backsteps)
+			make the respective direction-bool (a,b,c or d) equal to findPath with the coordinates of the new position with increased depth
+			if the direction-bool is true mark the respective sport with a ‘?’ denoting the optimal path
+	return true if any of a, b, c, d are true
+}
+
+- bool mazeSquareCheck: returns true if the coordinate given would be a valid coordinate (no out of bounds, Xs in the 4x4 image)		
+			
+- void moveCloser1313(char maze[][64]): follows the map left by findPath to get closer to the frackman
+{
+	for every direction respect to the hardcore’s position
+		if the maze has a ‘?’ at that position
+			move to that position
+			call record move to record the new position
+			return
+}
+
+- void doSomething()
+{
+	if dead, return
+	
+	if the hardcore is in rest state, waitStatus < waitTicks
+		add 1 to the waitStatus and return
+	else, he rested enough
+		set waitStatus to 0
+		decrease dirChangeTicks by 1 (ticks to do a random direction change)
+		decrease shoutWait ticks by 1 (ticks to annoy poor frackman)
+	
+	if the hardcore is leaving
+		call leaveTheFieldRightNow to get 1 step closer to the exit and return
+
+	if the hardcore’s hasn’t shouted in a while (shoutWait <= 0)
+		call shoutProtest to see if the hardcore is within shouting range and correct alignment
+			if true, play the annoying sound
+			annoy the frack by 2
+			set shoutTicks to 15 and return
+	else if the hardcore is within distance 4 but cant shout, return
+	
+	call lineWithFrack to see if the hardcore could walk a straight line to the frack
+	if the direction returned isn’t “none”
+		change the direction to the direction returned and give a step towards it
+		record the new position
+		set steps left to 0 and return
+	
+	compute the magnitude of the hardcore’s cellphone detection, M
+	create a char 2D array of 64x64 maze
+	create a variable maxDepth of type int
+	call createMaze on maze to fill it up
+	call solveMazeInRange, passing the hardcores position, the frack’s position, maxDepth and M
+		if it returns true, the frackman is in range of the hardcore
+			mark the fracks position on maze with ‘ ‘ and the hardcores position with ‘@‘ (for testing purposes)
+			call findPath on maze for the optimal path
+			call moveCloser1313 for the hardcore to move one step towards the frack
+			return
+
+	decrease the number of steps left by 1
+	if steps left is less or equal to 0
+		choose a new direction by calling chooseD
+		change steps left to a random number between 8 and 60 both inclusive
+		
+	if the dirChangeTicks is <= to 0 and calling intersection() returns true
+		set dirChangeTicks to 200
+		call chooseD and pass the current direction and the opposite direction as avoid1 and avoid2
+		set the direction to this new D, and compute a new number of steps left
+			 
+	for the given direction, check if the hardcore can move once in that direction
+		if he can, move towards it
+		if he can’t set the number of steps left to 0 (to choose a new direction next non-rest tick)
+	
+	call recordMove to record the new position
+}
+
+//————————————————————————————————————————————————————————————————————————————————————————————————————————————//
+
+StudentWorld’s functions:
+
+- StudentWorld destructor: call cleanUp()
+
+- int init():
+{
+	create a new random seed
+	allocate all the dirt in a 2D array, leaving empty spaces as nullptr
+	allocate a new frackman
+
+	
+	for L barrels, G hidden gold nuggets and B barrels
+		call randAllocateBig to get good x, y allocation coordinates
+		allocate the respective item (gold nuggets are set as pickable by frack)
+		push the item to the actor’s vector
+	set the variable oilCount to L	
+
+	compute the number of ticks to wait before allocating a new protester, set protesTickWait to this value
+	compute the max number of protesters, set maxProtest to this value
+	set protestWaitStatus and protestCount to 0 (a new protester will be allocated on the first tick)
+	return GWSTATUS_CONTINUE_GAME
+}
+
+- int move():
+{
+	set the games stat text to the value returned by statString()
+	
+	call the fracks doSomething
+	for every actor in the actor’s vector
+		call their doSomething function
+	
+	create a random number from 0 to G, if the number is 1
+		create a random number from 0 to 4, if it is 1
+			allocate a new Sonar and push it to the actors vector
+		the number isn’t 1, water party!
+			call allocateWater to get a good x,y to allocate water pools
+			allocate a new WaterPool with the x and y from allocateWater
+			push the new actor to the actor’s vector
+
+	if the protestWait is greater than 0
+		reduce its value by 1
+	if it isn’t greater than 0
+		if the number of protester’s in the game is less than maxProtest
+			compute the percentage chance for a hardcore to be allocated, P
+			create a random number from 1 to 100, R
+			if R is bigger than P
+				allocate a regular protester and push him to the vector
+			else, R is less than P
+				allocate a hardcore protester
+			increase protestCount by 1
+			set protestWaitState to ProtestTickWait to wait for the next protester allocation
+	
+	if the frack is dead
+		call decLives and return GWSTATUS_PLAYER_DIED
+	if the oilCount is 0
+		return GWSTATUS_FINISHED_LEVEL
+	
+	for every actor in the actor’s vector
+		if the actor is dead
+			delete the actor’s pointer
+			set the pointer to nullptr (just in case)
+			erase the item from the vector
+	
+	return GWSTATUS_CONTINUE_GAME
+}
+
+- virtual void cleanUp()
+{
+	for every pointer in the dirt* array
+		delete the pointer and set it to nullptr
+	
+	delete the frack’s pointer and set it to null
+	
+	while the actor’s vector isn’t empty
+		delete the first pointer, set it to null and erase it from the vector
+}
+
+- bool clearDirt (int x, int y): clears dirt in the 4x4 square formed at x,y
+{
+	for x up to x+3
+		for y up to y+3
+			if the pointer isn’t null
+				delete it and set it to null
+
+	if at least 1 dirt was cleared, return true. False otherwise
+}
+
+- void randAllocateBig (int& x, int& y): returns a good x and y allocation by reference to allocate barrel, gold nuggets or boulders
+{
+	do at least once
+		compute a random x from 0 to 60
+		compute a random y form 0 to 56 
+	if the x and y are out of range or within the shaft or too close to another item, repeat
+}
+
+- bool goodCreationD (int x, int y): 
+{
+	if actors vector isn’t empty, for every actor on the vector
+		if the distance from the (x,y) to the actors is less than 6
+			return false
+
+	return true
+}
+
+- double distance (Actor* ptr1, Actor* ptr2): returns the distance between ptr1 and ptr2
+
+- bool boulThere (Direction d, Actor* ptr): returns true if there is a boulder in the direction given
+{
+	if the actor’s vector isn’t empty, for every actor
+		call isBoulder(), if true
+			in the direction passed
+				if there is a boulder that would impede walking in that direction from ptr’s location, return true
+	
+	return false
+}
+
+- bool boulThere (Direction d, int x, int y): same as above, but receives x and y instead of a ptr
+
+- string statString() const: returns a string formatted for the stat text
+
+- string intToStr (int n) const: given an int returns a string of it (my version of to_string)
+{
+	if n is 0, return “0”
+	create a string to return, stringer
+	from int k = log 10 of n to 0
+		divide the number by 10^k and get the module and add ‘0’. Append the character to stringer
+	return stringer
+}
+
+- bool isDirty(int x, int y): returns true if there is dirt in the coordinate, false if it’s out of bounds or clean
+
+- void sonarReveal(): activates sonar, makes all actors in radius 5 visible
+{
+	if the actor’s vector isn’t empty, for every actor
+		call distance passing frack and the actual actor
+		if the distance is <= to 15, make it visible
+}
+
+- void dropGold(): allocates a new gold nugget
+{
+	allocate a new bribing gold nugget with the x and y of frackman
+	push it to the actor’s vector
+}
+		 
+- bool greedyB(Actor* gold): used to bribe protesters
+{
+	for every actor on the vector
+		if the actor is a human
+			if the actor is within distance 3
+				play protester found gold sound
+				if the protester is hardcore
+					call bribeHard from him
+					increase score by 50
+				if its a regular protester 
+					set call leaveField from him
+					increase score by 25		
+				return true
+	return false
+}
+
+- void humanBoulder (Actor* ptrB): kills humans
+{
+	for every actor in the vector
+		if the actor is a human
+			if the distance from the boulder to the actor is less or equal to 3
+				annoy him by 100 and pass true to it 
+}
+
+- void allocateWater (int& x, int& y): references a good x and y to allocate water pools
+{
+	do 
+		generate a random x from 0 to 60 and a random y from 0 to 60
+	if the 4x4 square at x,y overlaps with dirt or a boulder, repeat
+}
+
+- bool squirtMan (Actor* squirt): squirts people and annoys them
+{
+	for every actor in the vector
+		if the actor is human
+			if the distance from the squirt to this human is <= 3
+				annoy him by 2 and return true
+	return false
+}
+
+- void allocateSquirt(): attempts to allocate a squirt given the fracks direction and x,y
+{
+	for the specific direction of the actor
+		if the coordinate of the frack+4 in its direction isn’t out of bounds
+			check if there is at least 1 dirt in the 4x4 square at that coordinate or a boulder
+				there is, return
+				there isn’t, allocate a new Squirt and push it to the vector
+}
+
+
+//————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————//
+
+	
+2) There isn’t any functionality I failed to do (or that I noticed)
+
+
+//————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————//
+
+	
+3) Design decisions:
+
+- Maze solving to leave the field would be too complicated. So I used a linked list of coordinates that gets updates with every move. This list is backtracked by protesters to leave the field
+
+- For the hardcore protester, I decided to check first if he is within a straight line over maze checking. At the end, if the frack is in a straight line, maze solving would achieve the same.
+
+
+//————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————|————//
+
+	
+4) Testing:
+
+Most of the testing was done by playing the game itself and comparing it to the one given.
+
+- Gold, Barrel, Sonars and WaterPools: all of them do pretty much the same. I tested them by playing.
+	For gold, I tested the bribing process by playing player give up sound when dropped and when bribing someone. This way I know when and what function was called
+
+- Frackman: most of it was playing. There isn’t much into him.
+
+- Boulder: I checked the fact that it cant be walked through by checking all directions and possible positions surrounding it with the frack. Then killing ability of it by emptying and leaving the frack underneath.
+
+- Dirt: There isn’t much to test
+
+- Protesters: 
+	* Tested them dying by making them still and squirting them. If they played a sound, they died
+	* Tested them annoying the frack by leaving the frack still, wait for them to shout and start overlapping them. This way I see if they adjust their direction
+	* Tested their line of sight by playing player give up each time the line of sight function returns true. If it’s played multiple times and the frackman indeed is within line of sight, the function worked. Also, if the protesters are getting closer while playing.
+	* Tested their backtracking leave the field by making them take a weird path via line of sight, killing the protester and seeing if he takes the same path and is removed at the end
+	
+- HardCore:
+	* Tested the maze solving by printing the maps every tick via cerr. Given the fracks position, the HardCore’s position, I check that the path is indeed correct.
+	* I also tested its range by playing player give up sound when within range. If it was played multiple times, the frack is within range. This then I compared with the maps printed to check if they are correct.
+	
+- Squirt: I tested the squirt’s killing instinct by squirting protesters to death. Also, I used the key F to slowly watch its movement and see that it actually moved only 4 squares.
+
+- StudentWorld:
+	* Tested random allocation by setting the allocated items to visible and seeing how spread they were.
+	* Tested cleanUp by setting some deletions to false, in that way some items weren’t deleted when they should and they appeared on the next level.
+	* Tested  squirt allocation by shooting in empty areas, to dirt, to boulders and out of bounds.
+	* Tested water allocation by cleaning some dirt and making waterPools allocate every other tick. If all water is on empty areas it’s all good.
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
